@@ -64,3 +64,15 @@ Our model achieves the following performance on :
 | Ours-Doc2Dial  |     37.09     |     44.94    | 48.28    52.73 | **46.85**    53.54 |
 | Ours-TIAGE  |     39.21   |     46.07    | 45.04    49.60 | 48.84    53.17 |
 
+## Citation
+
+```
+@misc{xu2024unsupervised,
+      title={Unsupervised Mutual Learning of Dialogue Discourse Parsing and Topic Segmentation}, 
+      author={Jiahui Xu and Feng Jiang and Anningzhe Gao and Haizhou Li},
+      year={2024},
+      eprint={2405.19799},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
