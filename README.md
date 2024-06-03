@@ -5,6 +5,12 @@ This repository is the official implementation of "Unsupervised Mutual Learning 
 ## Introduction
 In this paper, we propose an unsupervised joint modeling of rhetoric and topic structures under the discourse in linguistics, enabling mutual learning between the two.
 ![Model Architecture](https://github.com/Jeff-Sue/URT/blob/main/main2.png)
+
+## Motivation
+- In order to address the issue that current large models are unable to simultaneously meet the needs of third-party companies and users. We believe that the joint modeling of topic and rhetorical structures can help in understanding and controlling the direction of the entire conversation.
+- In linguistics, topics and rhetorical structures are often interrelated and influential, but previous work has focused only on one aspect or used one to assist the other. We have decided to be the first to attempt a joint modeling of both.
+- Due to the issues of data sparsity and information scarcity in both rhetoric and topics, we have chosen to conduct joint modeling in an unsupervised setting.
+
 ## Requirements
 
 To install requirements:
@@ -15,15 +21,15 @@ pip install -r requirements.txt
 
 ## Data
 
-Source of the data:
+Here, we give the sources of four dataset we used, please download them and put in the **data/{dataset_name}/** files:
 
-STAC: https://github.com/chijames/structured_dialogue_discourse_parsing/tree/master/data/stac
+**STAC**: https://github.com/chijames/structured_dialogue_discourse_parsing/tree/master/data/stac
 
-Molweni: https://github.com/chijames/structured_dialogue_discourse_parsing/tree/master/data/molweni
+**Molweni**: https://github.com/chijames/structured_dialogue_discourse_parsing/tree/master/data/molweni
 
-Doc2Dial: https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/dial-start
+**Doc2Dial**: https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/dial-start
 
-TIAGE: https://github.com/HuiyuanXie/tiage
+**TIAGE**: https://github.com/HuiyuanXie/tiage
 
 ## Pre-trained Models
 
