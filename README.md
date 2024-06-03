@@ -37,7 +37,7 @@ Source of pre-trained models:
 
 Bart-Large-CNN: https://huggingface.co/facebook/bart-large-cnn
 
-NSP-BERT: This model was trained following the DialSTART approach, with modifications to the structure and input of the cls layer. The resulting model serves as a pre-trained model for topic modeling, yielding a basic topic matrix. You can download it from the link: https://drive.google.com/file/d/12BzNwtbMyTL2jaEKpXOTWeOeqRJ55orF/view?usp=drive_link
+NSP-BERT: This model was trained following the DialSTART approach, with modifications to the structure and input of the cls layer. The resulting model serves as a pre-trained model for topic modeling, yielding a basic topic matrix. You can download it from the [link](https://drive.google.com/file/d/12BzNwtbMyTL2jaEKpXOTWeOeqRJ55orF/view?usp=drive_link).
 
 
 ## Training and Evaluation
@@ -60,4 +60,4 @@ Our model achieves the following performance on :
 
 | Model name         | STAC(F1) |Molweni(F1) | Doc2Dial(Pk, WD) | TIAGE(Pk, WD)|
 | ------------------ |---------------- | -------------- |---------------- | -------------- |
-| My awesome model   |     38.38     |     46.24      | 44.96 49.49 | 48.53 53.00 |{: .highlight }
+| My awesome model   |     38.38     |     46.24      | 44.96 49.49 | 48.53 53.00 {: .highlight }
