@@ -52,11 +52,6 @@ python main.py
 
 Our model achieves the following performance on :
 
-<style>
-    .highlight {
-        background-color: lightblue;
-    }
-</style>
 
 | Model name         | STAC(F1↑) |Molweni(F1↑) | Doc2Dial(Pk↓, WD↓) | TIAGE(Pk↓, WD↓)|
 | ------------------ |---------------- | -------------- |---------------- | -------------- |
