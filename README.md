@@ -2,6 +2,9 @@
 
 This repository is the official implementation of "Unsupervised Mutual Learning of Dialogue Discourse Parsing and Topic Segmentation".
 
+## Introduction
+In this paper, we propose an unsupervised joint modeling of rhetoric and topic structures under the discourse in linguistics, enabling mutual learning between the two.
+![Model Architecture]()
 ## Requirements
 
 To install requirements:
