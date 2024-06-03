@@ -4,7 +4,7 @@ This repository is the official implementation of "Unsupervised Mutual Learning 
 
 ## Latest News
 - [3/6/2024]: Release the code of the paper.
-- [90/5/2024]: Release the [paper](https://arxiv.org/abs/2405.19799).
+- [30/5/2024]: Release the [paper](https://arxiv.org/abs/2405.19799).
 
 
 ## Introduction
