@@ -54,10 +54,18 @@ Our model achieves the following performance on :
 
 <style>
     .highlight {
-        background-color: yellow;
+        background-color: lightblue;
     }
 </style>
 
-| Model name         | STAC(F1) |Molweni(F1) | Doc2Dial(Pk, WD) | TIAGE(Pk, WD)|
+| Model name         | STAC(F1↑) |Molweni(F1↑) | Doc2Dial(Pk↓, WD↓) | TIAGE(Pk↓, WD↓)|
 | ------------------ |---------------- | -------------- |---------------- | -------------- |
-| My awesome model   |     38.38     |     46.24      | 44.96 49.49 | 48.53 53.00 {: .highlight }
+| DialSTART  |     -    |     -     | 45.92 50.25 | 50.28 54.23|
+| Bart-Large  |     37.00    |     42.25     | - - | - -|
+| Simple Addition  |     34.79    |     42.67     | 47.75 52.23 | 49.70 53.12|
+| Ours-Full Dataset  |     38.38     |     46.24      | **44.96 49.49** | 48.53 **53.00** |
+| Ours-STAC  |     39.02     |     42.67     | 45.75 50.25 | 49.88 54.41 |
+| Ours-Molweni  |     **40.22**     |     **50.55**    | 51.36 58.22 | 48.72 55.89 |
+| Ours-Doc2Dial  |     37.09     |     44.94    | 48.28 52.73 | **46.85** 53.54 |
+| Ours-TIAGE  |     39.21   |     46.07    | 45.04 49.60 | 48.84 53.17 |
+
