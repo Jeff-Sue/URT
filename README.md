@@ -2,6 +2,11 @@
 
 This repository is the official implementation of "Unsupervised Mutual Learning of Dialogue Discourse Parsing and Topic Segmentation".
 
+## Latest News
+- [3/6/2024]: Release the code of the paper
+- [90/5/2024]: Release the [paper](https://arxiv.org/abs/2405.19799)
+
+
 ## Introduction
 In this paper, we propose an unsupervised joint modeling of rhetoric and topic structures under the discourse in linguistics, enabling mutual learning between the two.
 ![Model Architecture](https://github.com/Jeff-Sue/URT/blob/main/main2.png)
