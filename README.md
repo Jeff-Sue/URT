@@ -4,7 +4,7 @@ This repository is the official implementation of "Unsupervised Mutual Learning 
 
 ## Introduction
 In this paper, we propose an unsupervised joint modeling of rhetoric and topic structures under the discourse in linguistics, enabling mutual learning between the two.
-![Model Architecture]()
+![Model Architecture](https://github.com/Jeff-Sue/URT/blob/main/main2.png)
 ## Requirements
 
 To install requirements:
