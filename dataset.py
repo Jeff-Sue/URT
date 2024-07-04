@@ -3,6 +3,7 @@ from tqdm import tqdm
 import random
 import json
 from eda import eda
+from transformers import set_seed
 
 
 def check_for_letters(input_string):
@@ -39,7 +40,7 @@ def get_rhe_datasets_stac():
                     texts2.append(j['text'])
                     texts3.append(j['text'])
 
-            if len(texts) > 2 and len(texts) < 12:
+            if len(texts) > 2 and len(texts) < 18:
                 train_dataset.append(texts)
                 test_labels = []
                 for r in i['relations']:
@@ -65,7 +66,7 @@ def get_rhe_datasets_stac():
                     texts2.append(j['text'])
                     texts3.append(j['text'])
 
-            if len(texts) > 2 and len(texts) < 10:
+            if len(texts) > 2 and len(texts) < 18:
                 dev_dataset.append(texts)
                 test_labels = []
                 for r in i['relations']:
@@ -144,7 +145,7 @@ def get_rhe_datasets_molweni():
     return train_dataset, train_labels, dev_dataset, dev_labels, test_dataset
 
 
-def get_top_datasets1():
+def get_top_datasets_doc():
     path_input_docs = f'./data/doc2dial'
     input_files = [f for f in os.listdir(path_input_docs) if os.path.isfile(os.path.join(path_input_docs, f))]
     random.shuffle(input_files)
@@ -172,7 +173,7 @@ def get_top_datasets1():
 
             for line in open(path_input_docs + '/' + file):
                 if '================' not in line.strip():
-                    if len(text) < 8:
+                    if len(text) < 18:
                         text.append(line.strip())
             train_dataset.append(text)
 
@@ -185,7 +186,7 @@ def get_top_datasets1():
 
             for line in open(path_input_docs + '/' + file):
                 if '================' not in line.strip():
-                    if len(text) < 7:
+                    if len(text) < 18:
                         text.append(line.strip())
             dev_dataset.append(text)
 
@@ -207,6 +208,7 @@ def get_top_datasets1():
 def get_top_datasets_711():
     path_input_docs = f'./data/dialseg711'
     input_files = [f for f in os.listdir(path_input_docs) if os.path.isfile(os.path.join(path_input_docs, f))]
+    set_seed(42)
     random.shuffle(input_files)
     # 计算各个数据集的大小
     total_size = len(input_files)
@@ -265,7 +267,7 @@ def get_top_datasets_711():
     return train_files, dev_files, test_files, train_dataset, dev_dataset, test_dataset
 
 
-def get_top_dataset2():
+def get_top_dataset_tiage():
     with open('data/TIAGE/train.json', 'r') as f:
         data = json.load(f)
         train_dataset = []
@@ -280,7 +282,7 @@ def get_top_dataset2():
             dialogue7 = []
             tmp = []
             for u in v:
-                if len(dialogue) < 10:
+                if len(dialogue) < 18:
                     dialogue.append(u[0])
                     if check_for_letters(u[0]) and len(u[0]) > 5:
                         dialogue2.append(eda(sentence=u[0])[0])
@@ -321,7 +323,7 @@ def get_top_dataset2():
             dialogue7 = []
             tmp = []
             for u in v:
-                if len(dialogue) < 10:
+                if len(dialogue) < 18:
                     dialogue.append(u[0])
                     if check_for_letters(u[0]) and len(u[0]) > 5:
                         dialogue2.append(eda(sentence=u[0])[0])
