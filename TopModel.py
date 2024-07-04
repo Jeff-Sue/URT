@@ -83,7 +83,7 @@ class SegModel(nn.Module):
         loss = margin_loss.clone() + topic_loss
         return loss, margin_loss, topic_loss
 
-    def infer(self, lengths1, lengths2, coheren_input, coheren_mask, coheren_type_id, topic_input=None, topic_mask=None, topic_num=None):
+    def infer1(self, lengths1, lengths2, coheren_input, coheren_mask, coheren_type_id, topic_input=None, topic_mask=None, topic_num=None):
         device = coheren_input.device
         torch.cuda.empty_cache()
 
@@ -138,6 +138,10 @@ class SegModel(nn.Module):
             topic_context_mean.append(torch.mean(topic_context[topic_context_count:topic_context_count + i], dim=0))
             topic_cur_mean.append(torch.mean(topic_cur[topic_cur_count:topic_cur_count + j], dim=0))
             topic_context_count, topic_cur_count = topic_context_count + i, topic_cur_count + j
+            # print("topic_context_mean_add", topic_context[topic_context_count:topic_context_count + i])
+            # print("topic_cur_mean_add", topic_cur[topic_cur_count:topic_cur_count + j])
+            # print("topic_context_mean: ", topic_context_mean)
+            # print("topic_cur_mean: ", topic_cur_mean)
         topic_context_mean, topic_cur_mean = pad_sequence(topic_context_mean, batch_first=True), pad_sequence(
             topic_cur_mean, batch_first=True)
         topic_scores = F.cosine_similarity(topic_context_mean, topic_cur_mean, dim=1, eps=1e-08).to(device)
@@ -159,9 +163,65 @@ class SegModel(nn.Module):
         mean = coheren_scores[:, 0].mean()
         std = coheren_scores[:, 0].std()
         scaled_tensor = 2 * (coheren_scores[:, 0] - mean) / std
+        # scale = 4 / (max_val - min_val)  # 计算缩放比例
+        # scaled_tensor = (coheren_scores[:, 0] - min_val) * scale - 2  # 进行缩放操作
+        # print("topic_scores: ", topic_scores)
+        # print("coheren_scores: ", coheren_scores[:, 0])
         final_scores = scaled_tensor + scaled_topic
 
+
+        # print("topic_scores: ", topic_scores)
+
+        # return torch.sigmoid(final_scores).detach().cpu().numpy().tolist()
         return torch.sigmoid(final_scores)
+
+    def infer(self, length1, length2, coheren_input, coheren_mask, coheren_type_id, topic_input=None, topic_mask=None, topic_num=None):
+
+        device = coheren_input.device
+        coheren_feature1, coheren_feature2, coheren_scores = self.coheren_model(length1=length1, length2=length2, input_ids=coheren_input, attention_mask=coheren_mask, token_type_ids=coheren_type_id)
+
+        coheren_scores = coheren_scores[0]
+
+        topic_context = self.topic_model(topic_input[0], topic_mask[0])[1]
+        topic_cur = self.topic_model(topic_input[1], topic_mask[1])[1]
+        topic_context_count = topic_cur_count = 0
+        topic_context_mean, topic_cur_mean = [], []
+
+        for i, j in zip(topic_num[0], topic_num[1]):
+            topic_context_mean.append(torch.mean(topic_context[topic_context_count:topic_context_count + i], dim=0))
+            topic_cur_mean.append(torch.mean(topic_cur[topic_cur_count:topic_cur_count + j], dim=0))
+            topic_context_count, topic_cur_count = topic_context_count + i, topic_cur_count + j
+        topic_context_mean, topic_cur_mean = pad_sequence(topic_context_mean, batch_first=True), pad_sequence(topic_cur_mean, batch_first=True)
+        # print("topic_context_mean: ", topic_context_mean.size(), topic_context_mean)
+        topic_scores = F.cosine_similarity(topic_context_mean, topic_cur_mean, dim=1, eps=1e-08).to(device)
+        # print("coherence scores: ", coheren_scores[:, 0])
+        # print("topic scores: ", topic_scores)
+        final_scores = coheren_scores[:, 0] + topic_scores
+        # print("final_scores: ", final_scores.size(), final_scores)
+
+        return topic_context_mean, topic_cur_mean, coheren_feature1, coheren_feature2, torch.sigmoid(final_scores)
+
+    def infer2(self, length1, length2, coheren_input, coheren_mask, coheren_type_id, topic_input=None, topic_mask=None,
+              topic_num=None):
+
+        device = coheren_input.device
+        coheren_feature1, coheren_feature2, coheren_scores = \
+        self.coheren_model(length1=length1, length2=length2, input_ids=coheren_input, attention_mask=coheren_mask,
+                           token_type_ids=coheren_type_id)[0]
+
+        topic_context = self.topic_model(topic_input[0], topic_mask[0])[1]
+        topic_cur = self.topic_model(topic_input[1], topic_mask[1])[1]
+        topic_context_count = topic_cur_count = 0
+        topic_context_mean, topic_cur_mean = [], []
+
+        for i, j in zip(topic_num[0], topic_num[1]):
+            topic_context_mean.append(torch.mean(topic_context[topic_context_count:topic_context_count + i], dim=0))
+            topic_cur_mean.append(torch.mean(topic_cur[topic_cur_count:topic_cur_count + j], dim=0))
+            topic_context_count, topic_cur_count = topic_context_count + i, topic_cur_count + j
+        topic_context_mean, topic_cur_mean = pad_sequence(topic_context_mean, batch_first=True), pad_sequence(
+            topic_cur_mean, batch_first=True)
+
+        return topic_context_mean, topic_cur_mean, coheren_feature1, coheren_feature2
 
     def topic_train(self, input_data, window_size):
         device, batch_size = input_data['coheren_inputs'].device, len(input_data['topic_context_num'])
@@ -322,17 +382,28 @@ class BertForNextSentencePrediction(BertPreTrainedModel):
 
         hs_1 = torch.empty(outputs[0].size(0), outputs[0].size(2)).to(length1.device)
         hs_2 = torch.empty(outputs[0].size(0), outputs[0].size(2)).to(length2.device)
-        for i in range(outputs[0].size(0)):
-            hs_1[i] = outputs[0][i, :min(self.args.max_text_length-1, int(length1[i]))].mean(dim=0)
+        # for i in range(outputs[0].size(0)):
+        #     hs_1[i] = outputs[0][i, :min(self.args.max_text_length-1, int(length1[i]))].mean(dim=0)
+        #
+        # for i in range(outputs[0].size(0)):
+        #     hs_2[i] = outputs[0][i, min(self.args.max_text_length-1, int(length1[i])):min(self.args.max_text_length, int(length1[i]) + int(length2[i]))].mean(dim=0)
 
         for i in range(outputs[0].size(0)):
-            hs_2[i] = outputs[0][i, min(self.args.max_text_length-1, int(length1[i])):min(self.args.max_text_length, int(length1[i]) + int(length2[i]))].mean(dim=0)
-            # print(outputs[0].size(), int(length1[i]) + int(length2[i]))
-        # hs = torch.cat((hs_1, hs_2), dim=1)
+            hs_1[i] = outputs[0][i, :min(124, int(length1[i]))].mean(dim=0)
+
+        for i in range(outputs[0].size(0)):
+            hs_2[i] = outputs[0][i, min(124, int(length1[i])): int(length1[i]) + int(length2[i])].mean(dim=0)
+
         hs = (hs_1 + hs_2)/2
-
+        # if input_ids.size(0) > 8:
+        #     print("input_ids: ", input_ids[8,:])
+        # if hs.size(0) > 8:
+        #     print(length1, length2)
+        #     print("hs1: ", hs_1[8,:])
+        #     print("hs2: ", hs_2[8, :])
         # pooled_output = outputs[1]
         seq_relationship_score = self.cls(hs)
+        # print("seq_relationship_score: ", seq_relationship_score)
 
         outputs = (seq_relationship_score,) + outputs[2:]  # add hidden states and attention if they are here
         if next_sentence_label is not None:
@@ -340,7 +411,75 @@ class BertForNextSentencePrediction(BertPreTrainedModel):
             next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
             outputs = (next_sentence_loss,) + outputs
 
-        return outputs  # (next_sentence_loss), seq_relationship_score, (hidden_states), (attentions)
+        return hs_1, hs_2, outputs  # (next_sentence_loss), seq_relationship_score, (hidden_states), (attentions)
+
+# class BertForNextSentencePrediction(BertPreTrainedModel):
+#     def __init__(self, config):
+#         super().__init__(config)
+#
+#         self.bert = BertModel(config)
+#         self.cls = BertOnlyNSPHead(config)
+#
+#         # Initialize weights and apply final processing
+#         self.post_init()
+#
+#     def forward(
+#             self,
+#             input_ids: Optional[torch.Tensor] = None,
+#             attention_mask: Optional[torch.Tensor] = None,
+#             token_type_ids: Optional[torch.Tensor] = None,
+#             position_ids: Optional[torch.Tensor] = None,
+#             head_mask: Optional[torch.Tensor] = None,
+#             inputs_embeds: Optional[torch.Tensor] = None,
+#             labels: Optional[torch.Tensor] = None,
+#             output_attentions: Optional[bool] = None,
+#             output_hidden_states: Optional[bool] = None,
+#             return_dict: Optional[bool] = None,
+#             return_feature=False,
+#             **kwargs,
+#     ):
+#
+#         if "next_sentence_label" in kwargs:
+#             warnings.warn(
+#                 "The `next_sentence_label` argument is deprecated and will be removed in a future version, use"
+#                 " `labels` instead.",
+#                 FutureWarning,
+#             )
+#             labels = kwargs.pop("next_sentence_label")
+#
+#         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+#
+#         outputs = self.bert(
+#             input_ids,
+#             attention_mask=attention_mask,
+#             token_type_ids=token_type_ids,
+#             position_ids=position_ids,
+#             head_mask=head_mask,
+#             inputs_embeds=inputs_embeds,
+#             output_attentions=output_attentions,
+#             output_hidden_states=output_hidden_states,
+#             return_dict=return_dict,
+#         )
+#
+#         pooled_output = outputs[1]
+#
+#         seq_relationship_scores = self.cls(pooled_output)
+#
+#         next_sentence_loss = None
+#         if labels is not None:
+#             loss_fct = CrossEntropyLoss()
+#             next_sentence_loss = loss_fct(seq_relationship_scores.view(-1, 2), labels.view(-1))
+#
+#         if not return_dict:
+#             output = (seq_relationship_scores,) + outputs[2:]
+#             return ((next_sentence_loss,) + output) if next_sentence_loss is not None else output
+#
+#         return NextSentencePredictorOutput(
+#             loss=next_sentence_loss,
+#             logits=seq_relationship_scores,
+#             hidden_states=outputs.hidden_states,
+#             attentions=outputs.attentions,
+#         ), pooled_output
 
 
 def tet(scores):
