@@ -15,6 +15,7 @@ from GAT2 import GATLayerImp1
 import math
 from RHE_TOP import RheInfer
 from TOP_RHE2 import HCExtraction, TopHC2Matrix, TopSingle2HC, compute_boundary
+from TOP_RHE3 import topmatrix
 
 
 class CustomLoss(nn.Module):
@@ -47,10 +48,13 @@ class CustomLoss(nn.Module):
         reg_term1 = 1. / (var_matrix1 + 1e-8)  # 加上一个小的常数防止除以0
         reg_term2 = 1. / (var_matrix2 + 1e-8)
         kl_loss = self.kl_divergence(matrix1, matrix2)
-        print(10 * mse_loss, self.alpha * (reg_term2 + reg_term1), self.beta * (1.0 / torch.mean(matrix1) + 1.0 / torch.mean(matrix2)), flush=True)
-
-        total_loss = 10 * mse_loss + self.alpha * (reg_term2 + reg_term1) + self.beta * (
-                    1.0 / torch.mean(matrix1) + 1.0 / torch.mean(matrix2))
+        # 计算总损失
+        # total_loss = 1000 * mse_loss + self.alpha * abs(kl_loss)
+        # total_loss = 100 * mse_loss + self.alpha * (reg_term2 + reg_term1) - self.beta * (torch.mean(matrix1) + torch.mean(matrix2))
+        # total_loss = 10 * mse_loss - self.alpha * (reg_term2 + reg_term1) - self.beta * (
+        #             1.0 / torch.mean(matrix1) + 1.0 / torch.mean(matrix2))
+        total_loss = 10 * mse_loss
+        # total_loss = 100 * mse_loss
 
         return total_loss
 
@@ -59,7 +63,7 @@ class MixModel(nn.Module):
     def __init__(self, args, gnn_layers=2):
         super().__init__()
         self.args = args
-        torch.manual_seed(42)
+        # torch.manual_seed(42)
         self.Topmodel = SegModel(args)
         self.Topmodel.to(args.device)
         self.fc1 = nn.Linear(args.emb_dim, args.hidden_dim)
@@ -76,13 +80,14 @@ class MixModel(nn.Module):
         self.rhe_model = rhe_model_params["model"](AutoConfig.from_pretrained(rhe_model_params["name"],
                                                                      output_attentions=True,
                                                                      ))
+        # self.RheModel = execution(rhe_model, rhe_model_params, file_path, None, layer, head, None, None, None)
         self.diff_loss = CustomLoss()
 
         self.affine1 = nn.Parameter(torch.empty(size=(args.hidden_dim, args.hidden_dim)))
         nn.init.xavier_uniform_(self.affine1.data, gain=1.414)
 
         self.drop = nn.Dropout(args.dropout)
-        max_n = 15
+        max_n = 20
         self.W_r_t = nn.Parameter(torch.empty(size=(max_n, max_n)))
         nn.init.xavier_uniform_(self.W_r_t.data, gain=1.414)
         # self.W_r_t = torch.nn.Parameter(torch.randn(1))
@@ -120,7 +125,7 @@ class MixModel(nn.Module):
         return one_matrix
 
 
-    def forward(self, input, label):
+    def forward(self, input, label, PR):
         # 拿到修辞结构和放入话题的修辞结构
         rhe_matrix, e_matrix = RheInfer(self.args.device, self.rhe_tokenizer, self.rhe_model, input)
 
@@ -134,22 +139,42 @@ class MixModel(nn.Module):
         new_matrix = new_matrix.clone().detach().to(self.args.device)
 
         # 拿到话题结构和放入修辞的话题结构
-        h1, h2, h_t1, h_t2, h_n1, h_n2, cc, cc_t, cc_n, lengths1, lengths2 = TopSingle2HC(self.args, self.top_tokenizer,
-                                                                                               text=input)
-        # 拿到放入GAT的topic和coherence的hidden states
-        H1, H2, C1, C2 = HCExtraction(self.args, self.Topmodel, text=input, single_topic_input1=h1,
-                                        single_topic_input2=h2, single_topic_attention1=h_t1,
-                                        single_topic_attention2=h_t2, single_topic_num1=h_n1, single_topic_num2=h_n2,
-                                        c_coheren_inputs=cc, c_coheren_masks=cc_t, c_coheren_type_ids=cc_n, lengths1=lengths1, lengths2=lengths2)
-        # 拿到修辞结构
-        top_matrix = TopHC2Matrix(self.args, self.Topmodel, text=input, single_topic_input1=h1,
-                                        single_topic_input2=h2, single_topic_attention1=h_t1,
-                                        single_topic_attention2=h_t2, single_topic_num1=h_n1, single_topic_num2=h_n2,
-                                        c_coheren_inputs=cc, c_coheren_masks=cc_t, c_coheren_type_ids=cc_n, lengths1=lengths1, lengths2=lengths2).to(self.args.device)
 
+        H1, H2, C1, C2, topscores = topmatrix(self.args, self.Topmodel, input)
+        top_matrix1 = torch.zeros(len(input), len(input))
+        # 拿到向上拓展的top_matrix1
+        for i in range(len(input)-1):
+            for j in range(i+1, len(input)):
+                top_matrix1[i, j] = min(topscores[i:j])
+        # 拿到完全的top_matrix2
+        top_matrix2 = torch.zeros_like(top_matrix1, dtype=torch.float)
+        sim1_all = []
+        sim2_all = []
+        c_num = 0
+        for i in range(top_matrix1.size(0) - 1):
+            for j in range(i+1, top_matrix1.size(1)):
+                sim1 = F.cosine_similarity(H1[i].unsqueeze(0), H2[j-1].unsqueeze(0), eps=1e-08)
+                sim1_all.append(sim1)
+                sim2 = self.Topmodel.coheren_model.cls((C1[i] + C2[j-1]) / 2.0)[0]
+                c_num += 1
+                sim2_all.append(sim2)
+        sim1_all = torch.stack(sim1_all).squeeze(1)
+        sim2_all = torch.stack(sim2_all)
+        # print("sim1_all: ", sim1_all, flush=True)
+        # print("sim2_all: ", sim2_all, flush=True)
+        sim_all = torch.sigmoid(sim1_all + sim2_all)
+        c_num = 0
+        for i in range(top_matrix1.size(0) - 1):
+            for j in range(i+1, top_matrix1.size(1)):
+                top_matrix2[i, j] = sim_all[c_num]
+                c_num += 1
+
+        top_matrix = torch.min(top_matrix1, top_matrix2)
 
         # 边界值
         boundary = compute_boundary(self.args, top_matrix)
+        # top_matrix = self.one_add(top_matrix)
+        # boundary1 = compute_boundary(self.args, top_matrix)
 
         # 拿到对应topic和coherence的hidden states的修辞结构
         list_order1, list_order2 = [], []
@@ -175,6 +200,8 @@ class MixModel(nn.Module):
                 if list_order2[i] == list_order2[j]:  # 相同的元素之间的关系是0
                     e_matrix_new2[i, j] = 1
                 else:
+                    # print(e_matrix, flush=True)
+                    # print(len(input), list_order2[i], list_order2[j], flush=True)
                     e_matrix_new2[i, j] = e_matrix[list_order2[i], list_order2[j]]
                     e_matrix_new2[j, i] = e_matrix[list_order2[i], list_order2[j]]
         e_matrix_new1 = e_matrix_new1.clone().detach().to(self.args.device)
@@ -211,61 +238,65 @@ class MixModel(nn.Module):
             H_2.append(H1_2)
         H_3 = [C1]
         for l in range(self.args.gnn_layers):
-            H1_3 = self.GAT[l](H_3[l], e_matrix_new3, False, e_matrix_new1.size(0))
+            H1_3 = self.GAT[l](H_3[l], new_matrix, False, e_matrix_new1.size(0))
             H_3.append(H1_3)
         H_4 = [C2]
         for l in range(self.args.gnn_layers):
-            H1_4 = self.GAT[l](H_4[l], e_matrix_new4, False, e_matrix_new2.size(0))
+            H1_4 = self.GAT[l](H_4[l], new_matrix, False, e_matrix_new2.size(0))
             H_4.append(H1_4)
         # print(H1_1.size())
         # 利用GAT得到的新的topic和coherence的hidden states得到TOP_RHE结构
         top_rhe_matrix = torch.zeros_like(rhe_matrix, dtype=torch.float, requires_grad=True)
-        temp_top_rhe_matrix = top_rhe_matrix.clone()
-        top_rhe_matrix1 = torch.zeros_like(rhe_matrix, dtype=torch.float)
-        top_rhe_matrix2 = torch.zeros_like(rhe_matrix, dtype=torch.float)
+        temp_top_rhe_matrix1 = top_rhe_matrix.clone()
+        temp_top_rhe_matrix2 = top_rhe_matrix.clone()
 
         sim1_all = []
         sim2_all = []
         c_num = 0
         for i in range(rhe_matrix.size(0) - 1):
             for j in range(i+1, rhe_matrix.size(1)):
-                sim1 = F.cosine_similarity(H1_1[i].unsqueeze(0), H1_2[j].unsqueeze(0),  eps=1e-08)
+                sim1 = F.cosine_similarity(H1_1[i].unsqueeze(0), H1_2[j-1].unsqueeze(0),  eps=1e-08)
                 sim1_all.append(sim1)
-                sim2 = self.Topmodel.coheren_model.cls((H1_3[c_num] + H1_4[c_num]) / 2.0)[0]
+                sim2 = self.Topmodel.coheren_model.cls((H1_3[i] + H1_4[j-1]) / 2.0)[0]
                 c_num += 1
                 sim2_all.append(sim2)
 
+
+        # 直接相加 无需其他操作
         sim1_all = torch.stack(sim1_all).squeeze(1)
         sim2_all = torch.stack(sim2_all)
 
-        max_val = sim1_all.max()  # 获取张量的最大值
-        min_val = sim1_all.min()  # 获取张量的最小值
-        if max_val == min_val:
-            # 防止出现全是1报错
-            scaled_sim1 = sim1_all
-        else:
-            mean = sim1_all.mean()
-            std = sim1_all.std()
-            scaled_sim1 = (sim1_all - mean) / std
+        sim_all = torch.sigmoid(sim1_all + sim2_all)
 
-        mean = sim2_all.mean()
-        std = sim2_all.std()
-        scaled_sim2 = (sim2_all - mean) / std
+        sim_all2 = []
+        num = 0
+        for i in range(rhe_matrix.size(0) - 1):
+            for j in range(i + 1, rhe_matrix.size(1)):
+                if j == i + 1:
+                    sim_all2.append(sim_all[num])
+                num += 1
 
-        sim_all = torch.sigmoid(scaled_sim1 + scaled_sim2)
         num = 0
         for i in range(rhe_matrix.size(0) - 1):
             for j in range(i+1, rhe_matrix.size(1)):
-                temp_top_rhe_matrix[i, j] = sim_all[num]
-                top_rhe_matrix1[i, j] = sim1_all[num]
-                top_rhe_matrix2[i, j] = sim2_all[num]
+                temp_top_rhe_matrix2[i, j] = sim_all[num]
+                temp_top_rhe_matrix1[i, j] = min(sim_all2[i:j])
                 num += 1
-        top_rhe_matrix = temp_top_rhe_matrix
+        top_rhe_matrix = torch.min(temp_top_rhe_matrix1, temp_top_rhe_matrix2)
         ###
 
         # 拿到复制的话题结构，和修辞结构一起得到RHE_TOP结构
-        top_matrix_copy = top_matrix.clone().detach().to(rhe_matrix.device)
-        rhe_top_matrix = (top_matrix_copy * self.W_r_t[:e_matrix.size(0), :e_matrix.size(1)] + rhe_matrix) / 2.0
+        top_matrix_copy1 = top_matrix.clone().detach().to(rhe_matrix.device)
+
+
+        top_matrix_copy = torch.zeros_like(top_matrix_copy1).to(top_matrix_copy1.device)
+        e_rows, e_cols = torch.triu_indices(top_matrix_copy1.size(0), top_matrix_copy1.size(1), offset=1)
+        upper_half_e = top_matrix_copy1[e_rows, e_cols]
+        for i in range(top_matrix_copy1.size(0) - 1):
+            for j in range(i + 1, top_matrix_copy1.size(1)):
+                top_matrix_copy[i, j] = (top_matrix_copy1[i, j] - upper_half_e.min()) / (upper_half_e.max() - upper_half_e.min()) + 1e-4
+
+        rhe_top_matrix = top_matrix_copy * rhe_matrix
         ###
 
         # 对两个复合结构进行normalization，然后进行损失函数计算
@@ -289,31 +320,10 @@ class MixModel(nn.Module):
             rhe_top_matrix_norm = rhe_top_matrix
             top_rhe_matrix_norm = top_rhe_matrix
 
-        # top_rhe_matrix_norm_no_gard = top_rhe_matrix_norm.detach()
-        # with torch.no_grad():
-        #     top_rhe_matrix_norm_no_gard = top_rhe_matrix_norm.clone().detach()
-        #     # rhe_top_matrix_norm_no_grad = rhe_top_matrix_norm.clone().detach()
+        loss = self.diff_loss(rhe_top_matrix_norm, top_rhe_matrix_norm)
 
-        ###
 
-        # 样例分析
-        if input[0] == 'Does va help to avoid mortgage foreclosure':
-            print(input)
-            print("rhe_matrix: ", rhe_matrix, flush=True)
-            print("e_matrix: ", e_matrix, flush=True)
-            print("boundary: ", boundary, flush=True)
-            # print("boundary1: ", boundary1, flush=True)
-            print("top_matrix: ", top_matrix, flush=True)
-            print("rhe_top_matrix: ", rhe_top_matrix, flush=True)
-            print("top_rhe_matrix1: ", top_rhe_matrix1, flush=True)
-            print("top_rhe_matrix2: ", top_rhe_matrix2, flush=True)
-            print("top_rhe_matrix: ", top_rhe_matrix, flush=True)
-            print("rhe_top_matrix_norm: ", rhe_top_matrix_norm, flush=True)
-            print("top_rhe_matrix_norm: ", top_rhe_matrix_norm, flush=True)
-            print("W_r_t: ", self.W_r_t, flush=True)
-            print('=='*10, flush=True)
-
-        return loss
+        return rhe_top_matrix, top_rhe_matrix, loss
 
 
 
