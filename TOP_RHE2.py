@@ -80,6 +80,8 @@ def TopSingle2HC(args, tokenizer, text):
     single_coheren_input1.append(encoded_sent2)
     single_coheren_input2 = [encoded_sent1] + single_coheren_input2
 
+
+
     for ci in range(len(text) - 1):
         for cj in range(ci + 1, len(text)):
             c_encoded_pair = single_coheren_input1[ci][0].tolist()[:-1][:99] + single_coheren_input2[cj][0].tolist()[
@@ -128,7 +130,6 @@ def TopHC2Matrix(args, Topmodel, text, single_topic_input1, single_topic_input2,
     except:
         print(text)
 
-
     scores = Topmodel.infer(lengths1, lengths2, c_coheren_inputs, c_coheren_masks, c_coheren_type_ids, topic_input, topic_mask, topic_num)
     top_matrix = torch.zeros(len(text), len(text))
     num = 0
@@ -169,6 +170,7 @@ def HCExtraction(args, Topmodel, text, single_topic_input1, single_topic_input2,
         print(text)
 
     coheren_feature = Topmodel.coheren_model.bert(c_coheren_inputs, c_coheren_masks, c_coheren_type_ids)[0]
+
     coheren_feature1 = torch.stack(
         [coheren_feature[i, :lengths1[i]].mean(dim=0) for i in range(coheren_feature.size(0))])
     coheren_feature2 = torch.stack([coheren_feature[i, lengths1[i]:lengths1[i] + lengths2[i]].mean(dim=0) for i in
@@ -177,6 +179,7 @@ def HCExtraction(args, Topmodel, text, single_topic_input1, single_topic_input2,
     topic_context = Topmodel.topic_model(topic_input[0], topic_mask[0])[1]
     topic_cur = Topmodel.topic_model(topic_input[1], topic_mask[1])[1]
     del coheren_feature
+
     topic_context_mean = torch.stack(
         [torch.mean(topic_context[sum(topic_num[0][:i]):sum(topic_num[0][:i + 1])], dim=0) for i in
          range(len(topic_num[0]))])
