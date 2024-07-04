@@ -3,6 +3,7 @@
 This repository is the official implementation of "Unsupervised Mutual Learning of Dialogue Discourse Parsing and Topic Segmentation".
 
 ## Latest News
+- [4/7/2024]: Release the new version.
 - [3/6/2024]: Release the code of the paper.
 - [30/5/2024]: Release the [paper](https://arxiv.org/abs/2405.19799).
 
