@@ -497,8 +497,13 @@ class GATLayerImp1(GATLayer):
             # Tip: it's conceptually easier to understand what happens here if you delete the NH dimension
             all_scores = self.leakyReLU(scores_source + scores_target.transpose(1, 2))
             # connectivity mask will put -inf on all locations where there are no edges, after applying the softmax
-            # this will result in attention scores being computed only for existing edges
-            all_attention_coefficients = self.softmax(all_scores + connectivity_mask)
+            # this will result in attention scores being computed only for existing edges`
+            # print("all_scores: ", all_scores[0], flush=True)
+            # print("connectivity_mask: ", connectivity_mask, flush=True)
+            new_scores = torch.zeros_like(all_scores)
+            for i in range(new_scores.size(0)):
+                new_scores[i] = torch.mul(all_scores[i], connectivity_mask)
+            all_attention_coefficients = self.softmax(new_scores)
 
         #
         # Step 3: Neighborhood aggregation
