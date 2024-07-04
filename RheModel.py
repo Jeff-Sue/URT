@@ -10,9 +10,21 @@ import json
 # import seaborn as sns
 import random
 import time
+# from tqdm.notebook import trange, tqdm
+# import sys
+# from IPython.core.debugger import set_trace #set_trace()
+# import matplotlib.ticker as ticker
+# import matplotlib.cm as cm
+# import matplotlib as mpl
+# import matplotlib.pyplot as plt
+# from functools import partial
+# from multiprocessing import Pool
+# from sklearn.manifold import TSNE
+# from sklearn.decomposition import PCA
+
+
 
 ### Generate EDU aggregated self-attention Matrixes from BART etc.
-
 
 class DiscDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, model_params):
@@ -122,6 +134,31 @@ def execution(model, model_params, datapoint, base_save_path, layer, head, datan
         random.shuffle(data)
     data, dimensions, edu_lengths = Mydata(datapoint)
     print("dimensions and edu length: ", len(data), dimensions, edu_lengths)
+    # data, dimensions, edu_lengths, file_name, file_full_path = Mydata(datapoint)
+    # file_name = file_name[0]  # Unwrap the added tupel dimension
+    # file_full_path = file_full_path[0]  # Unwrap the added tupel dimension
+    # curr_save_path = os.path.join(base_save_path, model_params["name"], "attention_matrices",
+    #                               str(layer) + "_" + str(head) + "_" + file_name + ".pt")
+    # if os.path.exists(curr_save_path):
+    #     edu_attn_matrix = torch.load(curr_save_path)
+    # else:
+    # if model is None:
+    #     if random_init:
+    #         # model = model_params["model"](AutoConfig.from_pretrained(model_params["name"],
+    #         #                                                          cache_dir="./huggingface_model_files",
+    #         #                                                          output_attentions=True,
+    #         #                                                          local_files_only=True))
+    #         model = model_params["model"](AutoConfig.from_pretrained(model_params["name"],
+    #                                                                  output_attentions=True,
+    #                                                                  ))
+    #     else:
+    #         # model = AutoModel.from_pretrained(model_params["name"],
+    #         #                                   cache_dir="./huggingface_model_files",
+    #         #                                   output_attentions=True,
+    #         #                                   local_files_only=True)
+    #         model = AutoModel.from_pretrained(model_params["name"],
+    #                                           output_attentions=True,
+    #                                           )
     device = torch.device('cuda')
     model.to(device)
     model.eval()
@@ -187,7 +224,12 @@ def execution(model, model_params, datapoint, base_save_path, layer, head, datan
                     edu_attn_matrix[second_idx, first_idx] = outgoing_subtable
             second_index_agg += item2
         first_index_agg += item1
+    # torch.save(edu_attn_matrix, curr_save_path)
 
+    # edu_attn_matrix loaded or generated
+    # base_data = {"layer": layer,
+    #              "head": head,
+    #              "file_name": file_name}
     base_data = {"layer": layer,
                  "head": head,
                  }
@@ -201,6 +243,11 @@ def execution(model, model_params, datapoint, base_save_path, layer, head, datan
 
     # print("half_edu_attn_matrix: ", half_edu_attn_matrix.size(), half_edu_attn_matrix)
     dep_tree, weight_matrix = eisner(half_edu_attn_matrix)
+    # eisner_results = exec_eisner(file_full_path, half_edu_attn_matrix, base_save_path, model_params["name"], layer,
+    #                              head, dataname)
+    # results.append({**base_data, **eisner_results})
+    # results.append(weight_matrix)
+    # results1.append(dep_tree)
 
     return dep_tree, weight_matrix
 
@@ -277,15 +324,30 @@ def single_execution(device, model, model_params, layers, heads, data, dimension
                             edu_attn_matrix[second_idx, first_idx] = outgoing_subtable
                     second_index_agg = second_index_agg + item2
                 first_index_agg = first_index_agg + item1
+            # torch.save(edu_attn_matrix, curr_save_path)
 
+            # edu_attn_matrix loaded or generated
+            # base_data = {"layer": layer,
+            #              "head": head,
+            #              "file_name": file_name}
+            base_data = {"layer": layer,
+                         "head": head,
+                         }
             mat_size = edu_attn_matrix.size(0)  # edu_attn matrix shape [n,n], n is nb of edu
-
+            # li: modify edu_attn_matrix to reduce backdward links, only take half right upper half, the other half give 0
             half_edu_attn_matrix = torch.zeros(mat_size, mat_size)
             for i in range(mat_size):
                 for j in range(mat_size):
                     if i <= j:
                         half_edu_attn_matrix[i, j] = edu_attn_matrix[i, j]
             matrix_list.append(half_edu_attn_matrix)
+            # # print("half_edu_attn_matrix: ", half_edu_attn_matrix.size(), half_edu_attn_matrix)
+            # dep_tree, weight_matrix = eisner(half_edu_attn_matrix)
+            # # eisner_results = exec_eisner(file_full_path, half_edu_attn_matrix, base_save_path, model_params["name"], layer,
+            # #                              head, dataname)
+            # # results.append({**base_data, **eisner_results})
+            # results.append(weight_matrix)
+            # results1.append(dep_tree)
 
     # print(f"--- {(time.time() - start_time_all)} seconds to complete head/layer combo ---\n")
     return matrix_list
@@ -564,3 +626,56 @@ BART_large_samsum = {"d_name": " + SAMSUM", "name":"linydub/bart-large-samsum", 
             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": BartModel}
 BART_large_squad2 = {"d_name": " + SQuAD2", "name":"phiyodr/bart-large-finetuned-squad2", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": BartModel}
+# RoBERTa_large = {"d_name": "ROBERTA-large", "name":"roberta-large", "prefix_len":1, "postfix_len":1, "max_input_size":512, "batch_size": 1,
+#             "start_token":0, "end_token":2, "has_token_type_ids": True, "attn_keyword": "attentions", "model": RobertaModel} #large: 24 x 16, https://huggingface.co/roberta-large/blob/main/config.json
+# DialoGPT = {"d_name": "DIALOGPT", "name":"microsoft/DialoGPT-small", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
+#             "start_token":50256, "end_token":50256, "has_token_type_ids": True, "attn_keyword": "attentions", "model": GPT2LMHeadModel} #12 x 12, https://huggingface.co/microsoft/DialoGPT-small/blob/main/config.json
+# DialogLED_large = {"d_name": "DialogLED", "name":"MingZhong/DialogLED-large-5120", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
+#             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": LEDModel} # https://huggingface.co/MingZhong/DialogLED-large-5120/blob/main/config.json
+# # Models that i fine-tuned
+# BART_large_dd_t2m_mix_shuf_all = {"d_name": " + dd_t2m_mix-shuf-all", "name":"cli/bart-large_dd_t2m_mix-shuf-all/checkpoint-26595", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
+#             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": BartModel}
+# BART_large_stac_t2m_mix_shuf_all = {"d_name": " + stac_t2m_mix-shuf-all", "name":"cli/bart-large_stac_t2m_mix-shuf-all/checkpoint-13258", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
+#             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": BartModel}
+
+
+### Execute
+# if __name__ == '__main__':
+#     curr_core = 0
+#     random_init = True
+#     orig_parseval = True
+#     layers = (0, 1)
+#     heads = (0, 1)
+#     model_params = {"d_name": " + CNN", "name":"facebook/bart-large-cnn", "prefix_len":1, "postfix_len":1, "max_input_size":1024, "batch_size": 1,
+#             "start_token":0, "end_token":2, "has_token_type_ids": False, "attn_keyword": "encoder_attentions", "model": BartModel}
+#     file_path = 'data/STAC/stac_situated.json'
+#     base_save_path = ''
+#     dataset = ''
+#
+#     if random_init:
+#         # model = model_params["model"](AutoConfig.from_pretrained(model_params["name"],
+#         #                                                          cache_dir="./huggingface_model_files",
+#         #                                                          output_attentions=True,
+#         #                                                          local_files_only=True))
+#         model = model_params["model"](AutoConfig.from_pretrained(model_params["name"],
+#                                                                  output_attentions=True,
+#                                                                  ))
+#     else:
+#         # model = AutoModel.from_pretrained(model_params["name"],
+#         #                                   cache_dir="./huggingface_model_files",
+#         #                                   output_attentions=True,
+#         #                                   local_files_only=True)
+#         model = AutoModel.from_pretrained(model_params["name"],
+#                                           output_attentions=True,
+#                                           )
+#
+#     for layer in range(0, layers[1]):
+#         for head in range(0, heads[1]):
+#             oneres, oneres1 = execution(curr_core, model, model_params, file_path, base_save_path, layer, head, random_init,
+#                                orig_parseval, dataset)
+#             for i in oneres:
+#                 print(i.size())
+#                 print(i)
+#
+#             for i in oneres1:
+#                 print(i)
